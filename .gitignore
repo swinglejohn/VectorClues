@@ -1,0 +1,5 @@
+.env
+.idea/
+__pycache__
+mp-test.py
+data
