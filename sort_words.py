@@ -8,11 +8,9 @@ from itertools import cycle
 from more_itertools import chunked
 from time import perf_counter_ns
 
-# some colorama colors
-# Fore.YELLOW, Fore.RED, Fore.GREEN, Fore.BLUE, Fore.CYAN, Fore.MAGENTA
 
-
-# the freneemy distance is the difference between the last two distances (last is either enemy or a friendly deemed too far away)
+# the frenemy distance is the difference between the last two distances
+# (the last distance is either enemy or a friendly deemed too far away)
 def get_frenemey_diff(distances):
     if len(distances) > 1:
         frenemy_diff = distances[-1][1] - distances[-2][1]
@@ -22,7 +20,6 @@ def get_frenemey_diff(distances):
 
 def calculate(pid, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_pairs):
     # lists of clues for 0, 1, 2,... words
-    #print(f"Just entered Process {pid}, len emb_pairs: {len(emb_pairs)}")
     clues = [[] for _ in range(len(friendly) + 1)]
 
     for word, wembedding in emb_pairs:
@@ -63,11 +60,9 @@ def calculate(pid, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_p
             if distance > friendly_cutoff:
                 break
 
-    # mpq.put(clues)
-    #print(f"inside process {pid}, len clues[2]: {len(clues[2])}")
     return clues
 
-def run(default_words=4, embeddings=None, printn = 3, friendly = None, enemy = None):
+def run(default_words=5, embeddings=None, printn = 3, friendly = None, enemy = None):
     run_start = perf_counter_ns()
     print(f"{Fore.CYAN}Using embedding style: {Fore.YELLOW}{STYLE}{Style.RESET_ALL}")
 
