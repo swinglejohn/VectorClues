@@ -2,7 +2,7 @@ from fire import Fire
 import numpy as np
 from tqdm import tqdm
 from utils import transform, untransform, get_user_words, STYLE, get_embeddings
-from colorama import Fore, Back, Style
+from colorama import Fore, Style
 import multiprocessing
 from itertools import cycle
 from more_itertools import chunked
@@ -18,23 +18,23 @@ def get_frenemey_diff(distances):
         frenemy_diff = distances[-1][1]
     return frenemy_diff
 
-def calculate(pid, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_pairs):
+def calculate(pid, friendly, civilian, enemy, emb_pairs):
     # lists of clues for 0, 1, 2,... words
     clues = [[] for _ in range(len(friendly) + 1)]
 
     for word, wembedding in emb_pairs:
         word = untransform(word, STYLE)
         skip = False
-        if word in friendly + enemy:
+        if word in list(friendly) + list(enemy):
             skip = True  # can't use a clue from the wordsets
-        for target in friendly + enemy:
+        for target in list(friendly) + list(enemy):
             if target in word or word in target:
                 skip = True  # can't use subwords as clues or vice versa
         if skip:
             continue
 
         distances = []
-        for target, tembedding in list(friendly_embeddings.items()) + list(enemy_embeddings.items()):
+        for target, tembedding in list(friendly.items()) + list(enemy.items()):
             distance = np.linalg.norm(tembedding - wembedding)
             distances.append((distance, target))
         distances.sort()
@@ -45,7 +45,7 @@ def calculate(pid, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_p
         for i, (distance, target) in enumerate(distances):
             if distance > enemy_cutoff:
                 break
-            if target in enemy_embeddings:
+            if target in enemy:
                 skip = True
                 break
         if skip:
@@ -57,28 +57,29 @@ def calculate(pid, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_p
             new_distances.append((target, distance))
             frenemy_diff = get_frenemey_diff(new_distances)
             clues[i].append((len(new_distances) - 1, frenemy_diff, new_distances.copy(), word))
-            if distance > friendly_cutoff:
+            if distance > friendly_cutoff or target not in friendly:
                 break
 
     return clues
 
-def run(default_words=5, embeddings=None, printn = 3, friendly = None, enemy = None):
+def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian = None, enemy = None):
     run_start = perf_counter_ns()
-    print(f"{Fore.CYAN}Using embedding style: {Fore.YELLOW}{STYLE}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}Using embedding style: {Fore.LIGHTGREEN_EX}{STYLE}{Style.RESET_ALL}")
 
     if not embeddings:
         embeddings = get_embeddings()
 
     if not friendly:
-        friendly, enemy = get_user_words(embeddings, default=default_words)
+        friendly, civilian, enemy = get_user_words(embeddings, default=default_words)
 
-    friendly_embeddings = {word:embeddings[transform(word, STYLE)] for word in friendly}
-    enemy_embeddings    = {word:embeddings[transform(word, STYLE)] for word in enemy}
+    friendly = {word:embeddings[transform(word, STYLE)] for word in friendly}
+    civilian = {word:embeddings[transform(word, STYLE)] for word in friendly}
+    enemy    = {word:embeddings[transform(word, STYLE)] for word in enemy}
     emb_pairs = list(embeddings.items())
     print(f"Number of emb pairs: {len(emb_pairs)}")
 
     # speed up the calculation with multiprocessing
-    num_processes = 12
+    num_processes = multiprocessing.cpu_count()
     print(f"\nCalculating distances - {num_processes} additional processes")
     start = perf_counter_ns()
     if num_processes:
@@ -90,7 +91,7 @@ def run(default_words=5, embeddings=None, printn = 3, friendly = None, enemy = N
             emb_sets[-2].extend(emb_sets[-1])
             emb_sets.pop()
         pids = list(range(1, num_processes+1))
-        theargs = list(zip(pids, cycle([friendly]), cycle([enemy]), cycle([friendly_embeddings]), cycle([enemy_embeddings]), emb_sets))
+        theargs = list(zip(pids, cycle([friendly]), cycle(civilian), cycle([enemy]), emb_sets))
         #print(f"len of theargs: {len(theargs)}")
         returned = pool.starmap(calculate, theargs)
         #print(f"len returned: {len(returned)}")
@@ -98,7 +99,7 @@ def run(default_words=5, embeddings=None, printn = 3, friendly = None, enemy = N
             for i in range(len(clues)):
                 clues[i].extend(new_clues[i])
     else:
-        clues = calculate(0, friendly, enemy, friendly_embeddings, enemy_embeddings, emb_pairs)
+        clues = calculate(0, friendly, civilian, enemy, emb_pairs)
     print(f"Finished calculating distances in {round((perf_counter_ns() - start) / 1e9, 2)} seconds")
 
     for tier in clues:

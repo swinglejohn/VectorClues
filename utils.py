@@ -43,7 +43,7 @@ def get_embeddings():
     return embeddings
 
 def get_user_words(embeddings, default):
-    friendly, enemy = [], []
+    friendly, civilian, enemy = [], [], []
     # "ninja" is not in the 10k word list
     if default==1:
         friendly, enemy = ["apple",  "fruit",  "angry",  "fight"], ["score",  "eat",  "ocean",  "play"]
@@ -60,23 +60,23 @@ def get_user_words(embeddings, default):
         friendly, enemy = ["hawaii", "cliff", "pig", "milk", "snap", "ham", "spring", "microwave", "web"], \
             ["india", "bolt", "chalk", "farm", "butter", "maple", "china", "centaur", "second"]
     elif default==7:
-        friendly, enemy = ["frog", "mustard", "string", "onion", "map", "war", "track", "bacon", "note"], \
-            ["green", "revolution", "triangle", "paper", "pipe", "kiwi", "point", "silk", "rubber"] + \
+        friendly, civilian, enemy = ["frog", "mustard", "string", "onion", "map", "war", "track", "bacon", "note"], \
+            ["green", "revolution", "triangle", "paper", "pipe", "kiwi", "point", "silk", "rubber"], \
             ["cap", "tank", "mammoth", "sound", "crash", "foam", "superhero"]
     elif default==8:
         friendly = ["squirrel", "night", "heart", "contract", "mint", "sub", "horn", "war", "delta"]
 
     if friendly:
-        print(f"Default words ({len(friendly+enemy)} total):")
+        print(f"Default words ({len(friendly+civilian+enemy)} total):")
         print(f"Your team's words: {Fore.GREEN}{friendly}{Style.RESET_ALL}")
+        print(f"Civilian words: {Fore.YELLOW}{civilian}{Style.RESET_ALL}")
         print(f"Enemy team and Assasin words: {Fore.RED}{enemy}{Style.RESET_ALL}")
-        return friendly, enemy
+        return friendly, civilian, enemy
 
     else:
         print("Enter the CodeNames words, space separated")
-        friendly = input("Your team's words: ").split()
-        enemy = input("Enemy team, civilian, and Assassin words: ").split()
 
+        friendly = input("Your team's words: ").split()
         toadd, toremove = [], []
         for word in friendly:
             if transform(word, STYLE) not in embeddings:
@@ -85,6 +85,16 @@ def get_user_words(embeddings, default):
                 toremove.append(word)
         friendly =  [word for word in friendly if word not in toremove] + toadd
 
+        civilian = input("Civilian words: ").split()
+        toadd, toremove = [], []
+        for word in civilian:
+            if transform(word, STYLE) not in embeddings:
+                print(f"{word} not in embeddings")
+                toadd.append(input("Re-enter: "))
+                toremove.append(word)
+        civilian =  [word for word in civilian if word not in toremove] + toadd
+
+        enemy = input("Enemy team and Assassin words: ").split()
         toadd, toremove = [], []
         for word in enemy:
             if transform(word, STYLE) not in embeddings:
@@ -93,5 +103,6 @@ def get_user_words(embeddings, default):
         enemy =  [word for word in enemy if word not in toremove] + toadd
 
         #assert(len(set(friendly+enemy)) == len(friendly+enemy), "Duplicate words")
-        return friendly, enemy
+        print()
+        return friendly, civilian, enemy
 

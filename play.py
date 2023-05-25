@@ -8,9 +8,9 @@ def run():
     print("Press Ctrl-c to exit")
     embeddings = get_embeddings()
     embeddings = {word:np.array(emb) for word, emb in embeddings.items()}
-    friendlies, enemies = get_user_words(embeddings=embeddings, default=0)
+    friendlies, civilian, enemies = get_user_words(embeddings=embeddings, default=0)
     while True:
-        sort_words(default_words=None, friendly=friendlies, enemy=enemies)
+        sort_words(default_words=None, friendly=friendlies, civilian=civilian, enemy=enemies)
 
         eliminated = input("Enter all words that have been eliminated: ").split()
         for word in eliminated:
