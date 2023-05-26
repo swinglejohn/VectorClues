@@ -9,7 +9,7 @@ OPENAI_API_KEY=<"Your-Key-Here">
 ```
 Then you need to embed the provided dictionary. This will cost a few cents. To do so run:
 ```commandline
-python3 embed_words.py run 
+python3 embed_words.py run all
 ```
 The embeddings are saved at ```data/default_embeddings.pkl ```.
 You need to change the name of this file to ```data/58k_embeddings_meaning.pkl```.

@@ -1,12 +1,14 @@
-from fire import Fire
-import numpy as np
-from tqdm import tqdm
-from utils import transform, untransform, get_user_words, STYLE, get_embeddings
-from colorama import Fore, Style
 import multiprocessing
 from itertools import cycle
-from more_itertools import chunked
 from time import perf_counter_ns
+
+import numpy as np
+from colorama import Fore, Style
+from fire import Fire
+from more_itertools import chunked
+from tqdm import tqdm
+
+from utils import STYLE, get_embeddings, get_user_words, transform, untransform
 
 
 # the frenemy distance is the difference between the last two distances
@@ -23,7 +25,7 @@ def calculate(pid, friendly, civilian, enemy, emb_pairs):
     clues = [[] for _ in range(len(friendly) + 1)]
 
     for word, wembedding in emb_pairs:
-        word = untransform(word, STYLE)
+        word = untransform(word)
         skip = False
         if word in list(friendly) + list(enemy):
             skip = True  # can't use a clue from the wordsets
@@ -72,11 +74,10 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
     if not friendly:
         friendly, civilian, enemy = get_user_words(embeddings, default=default_words)
 
-    friendly = {word:embeddings[transform(word, STYLE)] for word in friendly}
-    civilian = {word:embeddings[transform(word, STYLE)] for word in friendly}
-    enemy    = {word:embeddings[transform(word, STYLE)] for word in enemy}
+    friendly = {word:embeddings[transform(word)] for word in friendly}
+    civilian = {word:embeddings[transform(word)] for word in friendly}
+    enemy    = {word:embeddings[transform(word)] for word in enemy}
     emb_pairs = list(embeddings.items())
-    print(f"Number of emb pairs: {len(emb_pairs)}")
 
     # speed up the calculation with multiprocessing
     num_processes = multiprocessing.cpu_count()
@@ -100,16 +101,14 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
                 clues[i].extend(new_clues[i])
     else:
         clues = calculate(0, friendly, civilian, enemy, emb_pairs)
-    print(f"Finished calculating distances in {round((perf_counter_ns() - start) / 1e9, 2)} seconds")
+    print(f"Finished calculating distances in {round((perf_counter_ns() - start) / 1e9, 2)} seconds\n")
 
     for tier in clues:
-        # algorithms
+        # algorithms for sorting potential clues
         #tier.sort(key = lambda x: (x[2][0])) # Paul's
         #tier.sort(reverse=True, key=lambda x: x[1]) # sort for largest Frenemy distance
         tier.sort(key=lambda x: x[2][-2][1] if len(x[2])>1 else 1) # closest of last friendlies
         #tier.sort(key=lambda x: sum(y[1] for y in x[2][:-1]) if len(x[2])>1 else 1) # sum of all friendlies distances
-
-    print()
 
     for i in range(1, len(clues)):
         if not clues[i]:
@@ -125,12 +124,12 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
 
 def get_distance(word1, word2):
     embeddings = get_embeddings()
-    return np.linalg.norm(np.array(embeddings[transform(word1, STYLE)]) - np.array(embeddings[transform(word2, STYLE)]))
+    return np.linalg.norm(np.array(embeddings[transform(word1)]) - np.array(embeddings[transform(word2)]))
 
 # get closest n words to input word
 def get_closest(word, n=30):
-    print(f"Transforming \"{word}\" to \"{transform(word, style=STYLE)}\"")
-    word = transform(word, style=STYLE)
+    print(f"Transforming \"{word}\" to \"{transform(word)}\"")
+    word = transform(word)
 
     embeddings = get_embeddings()
     distances = []

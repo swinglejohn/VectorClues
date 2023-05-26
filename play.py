@@ -1,7 +1,7 @@
 import numpy as np
 
 from sort_words import run as sort_words
-from utils import DEFAULT_EMBEDDINGS, STYLE, get_embeddings, get_user_words
+from utils import get_embeddings, get_user_words
 
 
 def run():
