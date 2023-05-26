@@ -13,7 +13,7 @@ from tenacity import (before_sleep_log, retry, retry_if_not_exception_type,
                       stop_after_attempt, wait_random_exponential)
 from tqdm import tqdm
 
-from utils import transform, STYLE
+from utils import STYLE, transform
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -33,6 +33,7 @@ def get_embedding(texts, model="text-embedding-ada-002"):
 def run(n=5, embeddings_file_name="data/default_embeddings.pkl"):
     with open("data/corncob-58k-words.txt") as f:
         words = f.readlines()
+    # the missing words are words contained in Codenames and Codename Duet that corncob-58k was missing
     with open("data/missing-words.txt") as f:
         words.extend(f.readlines())
     if n != "all":
