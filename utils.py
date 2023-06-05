@@ -2,49 +2,64 @@ import pickle
 from time import perf_counter_ns
 
 import numpy as np
-from colorama import Back, Fore, Style
+from colorama import Fore, Style
 
-STYLE = "meaning"
-#STYLE = ""
-DEFAULT_EMBEDDINGS = "data/58k_embeddings"
-MISSING_EMBEDDINGS = "data/missing_embeddings"
-if STYLE:
-    DEFAULT_EMBEDDINGS += f"_{STYLE}"
-    MISSING_EMBEDDINGS += f"_{STYLE}"
-DEFAULT_EMBEDDINGS += ".pkl"
-MISSING_EMBEDDINGS += ".pkl"
+ALL_STYLES = ["", "spaces", "meaning"]
+STYLE = ""
 
-def transform(word):
+full_root = "data/58k_embeddings"
+missing_root = "data/missing_embeddings"
+
+# returns embedding file names given the style
+def get_emb_file(style):
+    full, missing = full_root, missing_root
+    if style:
+        full += f"_{style}"
+        missing += f"_{style}"
+    full += ".pkl"
+    missing += ".pkl"
+    return full, missing
+
+DEFAULT_EMBEDDINGS, MISSING_EMBEDDINGS = get_emb_file(STYLE)
+
+def transform(word, style=STYLE):
     word = word.strip()
-    if STYLE == "spaces":
+    if style == "spaces":
         return " " + word
-    elif STYLE == "meaning":
-        return "The meaning of the word \"" + word + "\""
-    else:
+    elif style == "meaning":
+        return f"The meaning of the word \"{word}\""
+    elif style == "not-spelling":
+        return f"The meaning and NOT the spelling of the word \"{word}\""
+    elif style == "":
         return word
+    else:
+        raise NotImplementedError("untransform not implemented for style", style)
 
-def untransform(word):
+def untransform(word, style=STYLE):
     word = word.strip()
-    if STYLE == "spaces":
+    if style == "spaces":
         return word
-        # The spaces words aren't stored with their space
-        #return word[1:]
-    elif STYLE == "meaning":
+    # The spaces words aren't stored with their space
+    #return word[1:]
+    elif style == "meaning":
         return word[25:-1]
-    else:
+    elif style == "":
         return word
+    else:
+        raise NotImplementedError("untransform not implemented for style", style)
 
-def get_embeddings():
-    print(f"Unpickling embeddings from {DEFAULT_EMBEDDINGS}")
+def load_embeddings(s=STYLE):
+    default_embeddings, missing_embeddings = get_emb_file(s)
+    print(f"Unpickling embeddings from {default_embeddings} and {missing_embeddings}")
     start = perf_counter_ns()
-    with open(DEFAULT_EMBEDDINGS, "rb") as f:
+    with open(default_embeddings, "rb") as f:
         embeddings = pickle.load(f)
-    if type(embeddings[transform("apple")]) == list:
+    if type(embeddings[transform("apple", s)]) == list:
         embeddings = {word: np.array(emb) for word, emb in embeddings.items()}
-    del embeddings[transform("lochness")]
+    del embeddings[transform("lochness", s)] # Loch Ness is two words and I added it to the missing words file
     # add in missing if not present (australia was missing from the 58k dictionary)
-    if transform("australia") not in embeddings:
-        with open(MISSING_EMBEDDINGS, "rb") as f:
+    if transform("australia", s) not in embeddings:
+        with open(missing_embeddings, "rb") as f:
             missing_embeddings = pickle.load(f)
         embeddings.update(missing_embeddings)
     print(f"Unpickling took {round((perf_counter_ns() - start) / 1_000_000_000, 2)} s")
@@ -106,7 +121,7 @@ def get_user_words(embeddings, default):
         toadd, toremove = [], []
         for word in enemy:
             if transform(word) not in embeddings:
-                toadd.append(input(f"{word} is not in the embeddings, re-enter: "))
+                toadd.append(input(f"{word} is not in the embeddings, re-enter: ").strip().lower())
                 toremove.append(word)
         enemy =  [word for word in enemy if word not in toremove] + toadd
 

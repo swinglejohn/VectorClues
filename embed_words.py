@@ -30,16 +30,17 @@ logger = logging.getLogger(__name__)
 def get_embedding(texts, model="text-embedding-ada-002"):
    return [x['embedding'] for x in openai.Embedding.create(input = texts, model=model)['data']]
 
-def run(n=5, embeddings_file_name="data/default_embeddings.pkl"):
+def run(n=5, s=STYLE ,embeddings_file_name="data/default_embeddings.pkl"):
+    words = []
     with open("data/corncob-58k-words.txt") as f:
-        words = f.readlines()
+        words.extend(f.readlines())
     # the missing words are words contained in Codenames and Codename Duet that corncob-58k was missing
     with open("data/missing-words.txt") as f:
         words.extend(f.readlines())
     if n != "all":
         words = words[:n]
-    print(f"{Fore.CYAN}Using embedding style: {Fore.LIGHTGREEN_EX}{STYLE}{Style.RESET_ALL}")
-    words = [transform(word) for word in words]
+    print(f"{Fore.CYAN}Using embedding style: {Fore.LIGHTGREEN_EX}{s}{Style.RESET_ALL}")
+    words = [transform(word, s) for word in words]
 
     embeddings = {}
     for batch in tqdm(list(chunked(words, BATCH_SIZE))):
@@ -53,20 +54,20 @@ def run(n=5, embeddings_file_name="data/default_embeddings.pkl"):
 
     print(f"Just embedded {len(embeddings)} words, stored in {embeddings_file_name}")
 
+
+###
+# These functions are just for data analysis
+###
+
+
 def print_first(n=10, embeddings_file_name="data/default_embeddings.pkl"):
     with open(embeddings_file_name, "rb") as f:
         embeddings = pickle.load(f)
     for word, embedding in list(embeddings.items())[:n]:
         print(f"\"{word}\"", len(embedding), embedding[:3])
 
-def file_size():
-    with open(TEXT_FILE) as f:
-        words = f.readlines()
-    words = [word.strip() for word in words]
-    print(len(words))
 
-
-from utils import DEFAULT_EMBEDDINGS, MISSING_EMBEDDINGS, get_embeddings
+from utils import DEFAULT_EMBEDDINGS, MISSING_EMBEDDINGS, load_embeddings
 
 
 # deprecated since we now store embeddings as numpy arrays
@@ -84,7 +85,7 @@ def missing_words():
     with open("data/codenames-words-duet.txt") as f:
         codenames_words = f.readlines()
     codenames_words = [word.strip().lower() for word in codenames_words]
-    embeddings = get_embeddings()
+    embeddings = load_embeddings()
     missing = []
     for word in codenames_words:
         if transform(word) not in embeddings:

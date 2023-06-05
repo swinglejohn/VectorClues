@@ -8,7 +8,8 @@ from fire import Fire
 from more_itertools import chunked
 from tqdm import tqdm
 
-from utils import STYLE, get_embeddings, get_user_words, transform, untransform
+from utils import (ALL_STYLES, STYLE, get_user_words, load_embeddings,
+                   transform, untransform)
 
 
 # the frenemy distance is the difference between the last two distances
@@ -20,6 +21,7 @@ def get_frenemey_diff(distances):
         frenemy_diff = distances[-1][1]
     return frenemy_diff
 
+# A helper function for generating clues
 def calculate(pid, friendly, civilian, enemy, emb_pairs):
     # lists of clues for 0, 1, 2,... words
     clues = [[] for _ in range(len(friendly) + 1)]
@@ -36,7 +38,7 @@ def calculate(pid, friendly, civilian, enemy, emb_pairs):
             continue
 
         distances = []
-        for target, tembedding in list(friendly.items()) + list(enemy.items()):
+        for target, tembedding in list(friendly.items()) + list(enemy.items()) + list(civilian.items()):
             distance = np.linalg.norm(tembedding - wembedding)
             distances.append((distance, target))
         distances.sort()
@@ -69,13 +71,13 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
     print(f"{Fore.CYAN}Using embedding style: {Fore.LIGHTGREEN_EX}{STYLE}{Style.RESET_ALL}")
 
     if not embeddings:
-        embeddings = get_embeddings()
+        embeddings = load_embeddings()
 
     if not friendly:
         friendly, civilian, enemy = get_user_words(embeddings, default=default_words)
 
     friendly = {word:embeddings[transform(word)] for word in friendly}
-    civilian = {word:embeddings[transform(word)] for word in friendly}
+    civilian = {word:embeddings[transform(word)] for word in civilian}
     enemy    = {word:embeddings[transform(word)] for word in enemy}
     emb_pairs = list(embeddings.items())
 
@@ -92,7 +94,7 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
             emb_sets[-2].extend(emb_sets[-1])
             emb_sets.pop()
         pids = list(range(1, num_processes+1))
-        theargs = list(zip(pids, cycle([friendly]), cycle(civilian), cycle([enemy]), emb_sets))
+        theargs = list(zip(pids, cycle([friendly]), cycle([civilian]), cycle([enemy]), emb_sets))
         #print(f"len of theargs: {len(theargs)}")
         returned = pool.starmap(calculate, theargs)
         #print(f"len returned: {len(returned)}")
@@ -110,28 +112,38 @@ def run(default_words=7, embeddings=None, printn = 3, friendly = None, civilian 
         tier.sort(key=lambda x: x[2][-2][1] if len(x[2])>1 else 1) # closest of last friendlies
         #tier.sort(key=lambda x: sum(y[1] for y in x[2][:-1]) if len(x[2])>1 else 1) # sum of all friendlies distances
 
+    def colorize(word):
+        if word in friendly:
+            return Fore.GREEN + word + Style.RESET_ALL
+        elif word in enemy:
+            return Fore.RED + word + Style.RESET_ALL
+        elif word in civilian:
+            return Fore.YELLOW + word + Style.RESET_ALL
+        else:
+            return word
+
     for i in range(1, len(clues)):
         if not clues[i]:
             break
-        print(f"{Fore.LIGHTMAGENTA_EX}TOP {printn} CLUES FOR {i} WORDS:{Style.RESET_ALL}")
+        print(f"{Fore.LIGHTMAGENTA_EX}TOP {printn} CLUES FOR {i} WORDS,{Style.RESET_ALL} ({len(clues[i])} TOTAL)")
         for _, frenemy_diff, distances, word in clues[i][:printn]:
             print(f"\"{word}\" for {len(distances) - 1}")
-            print(f"Frenemy Diff: {round(frenemy_diff, 4)}")
-            print(" ".join([(Fore.GREEN if target in friendly else Fore.RED) + str(target) + Style.RESET_ALL + ", " + str(round(distance, 4)) for target, distance in distances]))
+            #print(f"Frenemy Diff: {round(frenemy_diff, 4)}")
+            print(" ".join([colorize(target) + ", " + str(round(distance, 4)) for target, distance in distances]))
             print()
 
     print(f"Finished run in {round((perf_counter_ns() - run_start) / 1e9, 2)} seconds")
 
 def get_distance(word1, word2):
-    embeddings = get_embeddings()
+    embeddings = load_embeddings()
     return np.linalg.norm(np.array(embeddings[transform(word1)]) - np.array(embeddings[transform(word2)]))
 
 # get closest n words to input word
-def get_closest(word, n=30):
+def get_closest(word, n=40):
     print(f"Transforming \"{word}\" to \"{transform(word)}\"")
     word = transform(word)
 
-    embeddings = get_embeddings()
+    embeddings = load_embeddings()
     distances = []
     for (target, tembedding) in tqdm(embeddings.items()):
         distances.append(("\"" + target + "\"", np.linalg.norm(np.array(tembedding) - np.array(embeddings[word]))))
@@ -146,6 +158,29 @@ def get_closest(word, n=30):
     for i in range(len(distances)-1-x, len(distances)):
         print(f"{i:<3} {str(distances[i][0]):<50} {round(distances[i][1], 5)}")
 
+# compare closest n words for each different style side by side
+# similar to get_closest but for each style all at once printed in columns
+def compare_closest(word, n=40):
+    distances = [[] for _ in range(len(ALL_STYLES))]
+    for i, s in enumerate(ALL_STYLES):
+        tword = transform(word, s)
+        embeddings = load_embeddings(s)
+        for (target, tembedding) in tqdm(embeddings.items()):
+            distances[i].append(("\"" + target + "\"", np.linalg.norm(np.array(tembedding) - np.array(embeddings[tword]))))
+        distances[i].sort(key=lambda x: x[1])
+
+    # print styles as headers
+    print("Styles to compare (beginning with just the plain word")
+    for s in ALL_STYLES:
+        print(f"{s:<48}", end=" | ")
+    print()
+    print(f"The closest {n} words to {word} are:")
+    for words in zip(*(d[:n] for d in distances)):
+        for c in words:
+            print(f"{str(c[0]):<40} {round(c[1], 5):<7}", end=" | ")
+        print()
+
+    print()
 
 if __name__ == "__main__":
     Fire()
